@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id           String              @id @default(cuid())
+  id           String   @id @default(cuid())
   firstName    String
   lastName     String
-  email        String              @unique
+  email        String   @unique
   passwordHash String
-  createdAt    DateTime            @default(now())
-  scanAttempts Int                 @default(0)
+  createdAt    DateTime @default(now())
+  scanAttempts Int      @default(0)
 
   foundWallets FoundWallet[]
   license      License?
@@ -22,23 +22,23 @@ model User {
 }
 
 model License {
-  id                     String            @id @default(cuid())
-  userId                 String            @unique
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
   activatedAt            DateTime?
   expiresAt              DateTime?
-  status                 String            @default("INACTIVE")
-  keysPerMinute          Int               @default(1200)
-  machineEnabled         Boolean           @default(false)
-  priceUsd               Int               @default(50)
+  status                 String    @default("INACTIVE")
+  keysPerMinute          Int       @default(1200)
+  machineEnabled         Boolean   @default(false)
+  priceUsd               Int       @default(50)
   simulatedRoi           Float?
-  tier                   String            @default("STARTER")
-  lastProcessedMilestone Int               @default(0)
-  code                   String?           @unique
-  createdAt              DateTime          @default(now())
-  inventoryId            String?           @unique
+  tier                   String    @default("STARTER")
+  lastProcessedMilestone Int       @default(0)
+  code                   String?   @unique
+  createdAt              DateTime  @default(now())
+  inventoryId            String?   @unique
 
-  user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  inventory              LicenseInventory? @relation(fields: [inventoryId], references: [id])
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventory LicenseInventory? @relation(fields: [inventoryId], references: [id])
 }
 
 model LicenseInventory {
@@ -55,22 +55,22 @@ model LicenseInventory {
   expiresAt        DateTime?
   createdAt        DateTime  @default(now())
 
-  license          License?
+  license License?
 }
 
 model FoundWallet {
-  id               String              @id @default(cuid())
+  id               String   @id @default(cuid())
   userId           String
   network          String
   address          String
   balanceCrypto    Float
   balanceUsd       Float
-  foundAt          DateTime            @default(now())
-  status           String              @default("AVAILABLE")
+  foundAt          DateTime @default(now())
+  status           String   @default("AVAILABLE")
   priceSnapshotUsd Float?
 
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  withdrawals      WithdrawalRequest[]
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawals WithdrawalRequest[]
 }
 
 model WithdrawalRequest {
@@ -84,7 +84,7 @@ model WithdrawalRequest {
   status              String      @default("PENDING")
   requestedAt         DateTime    @default(now())
   estimatedProcessing String
-  createdAt DateTime @default(now())
+  createdAt           DateTime    @default(now())
   foundWallet         FoundWallet @relation(fields: [foundWalletId], references: [id], onDelete: Cascade)
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

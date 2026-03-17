@@ -271,7 +271,15 @@ export async function GET() {
 				: "Inactive",
 			serverNow: now.toISOString(),
 			wallet: newWallet,
-			recentWallets: recentWallets.map((item) => ({
+			recentWallets: recentWallets.map((item: {
+				id: string;
+				network: string;
+				address: string;
+				balanceCrypto: number;
+				balanceUsd: number;
+				priceSnapshotUsd: number | null;
+				foundAt: Date;
+			}) => ({
 				id: item.id,
 				network: item.network,
 				address: item.address,

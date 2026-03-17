@@ -59,11 +59,17 @@ export async function POST(req: Request) {
 		const network = normalizeString(body.network).toUpperCase();
 
 		if (!foundWalletId || !receiveAddress || !network) {
-			return NextResponse.json({ error: "Missing data to request the withdrawal" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "Missing data to request the withdrawal" },
+				{ status: 400 }
+			);
 		}
 
 		if (receiveAddress.length < 8 || receiveAddress.length > 120) {
-			return NextResponse.json({ error: "Invalid receiving address" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "Invalid receiving address" },
+				{ status: 400 }
+			);
 		}
 
 		const userLicense = await prisma.license.findUnique({
@@ -82,14 +88,20 @@ export async function POST(req: Request) {
 		}
 
 		if (foundWallet.status !== "AVAILABLE") {
-			return NextResponse.json({ error: "This finding has already been requested or processed" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "This finding has already been requested or processed" },
+				{ status: 400 }
+			);
 		}
 
 		const validNetworks = NETWORK_OPTIONS[foundWallet.network] || [];
 		const selectedNetwork = validNetworks.find((n) => n.key === network);
 
 		if (!selectedNetwork) {
-			return NextResponse.json({ error: "Invalid withdrawal network for this asset" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "Invalid withdrawal network for this asset" },
+				{ status: 400 }
+			);
 		}
 
 		const recentDuplicate = await prisma.withdrawalRequest.findFirst({
@@ -98,19 +110,25 @@ export async function POST(req: Request) {
 				foundWalletId: foundWallet.id,
 				receiveAddress,
 				network,
-				createdAt: {
-					gte: new Date(Date.now() - 5 * 60 * 1000),
-				},
+				status: "PENDING",
 			},
 		});
 
 		if (recentDuplicate) {
-			return NextResponse.json({ error: "Duplicate request detected" }, { status: 409 });
+			return NextResponse.json(
+				{ error: "Duplicate request detected" },
+				{ status: 409 }
+			);
 		}
 
-		const netCrypto = Math.max(0, foundWallet.balanceCrypto - selectedNetwork.feeCrypto);
+		const netCrypto = Math.max(
+			0,
+			foundWallet.balanceCrypto - selectedNetwork.feeCrypto
+		);
+
 		const usdRatio =
 			foundWallet.balanceCrypto > 0 ? netCrypto / foundWallet.balanceCrypto : 0;
+
 		const netUsd = Number((foundWallet.balanceUsd * usdRatio).toFixed(2));
 
 		if (netCrypto <= 0 || netUsd <= 0) {
@@ -152,7 +170,7 @@ export async function POST(req: Request) {
 			withdrawal: result,
 		});
 	} catch (error) {
-		console.error("withdrawals/request error", error);
+		console.error("withdrawls/request error", error);
 		return NextResponse.json({ error: "Internal error" }, { status: 500 });
 	}
 }
