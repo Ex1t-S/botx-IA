@@ -2,7 +2,11 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
+if (!process.env.JWT_SECRET) {
+	throw new Error("JWT_SECRET is required");
+}
+
+const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 const COOKIE_NAME = "wallet_demo_token";
 
 export async function hashPassword(password: string) {

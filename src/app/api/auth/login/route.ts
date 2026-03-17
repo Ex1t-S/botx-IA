@@ -4,19 +4,24 @@ import { comparePassword, createToken, setAuthCookie } from "../../../../lib/aut
 
 export async function POST(req: Request) {
 	try {
-		const { email, password } = await req.json();
+		const body = await req.json();
+		const email = String(body.email || "").trim().toLowerCase();
+		const password = String(body.password || "");
+
 		if (!email || !password) {
 			return NextResponse.json({ error: "Missing credentials" }, { status: 400 });
 		}
 
 		const user = await prisma.user.findUnique({ where: { email } });
+
 		if (!user) {
-			return NextResponse.json({ error: "User not found" }, { status: 404 });
+			return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 		}
 
 		const valid = await comparePassword(password, user.passwordHash);
+
 		if (!valid) {
-			return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+			return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 		}
 
 		const token = await createToken({ userId: user.id, email: user.email });

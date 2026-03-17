@@ -15,12 +15,27 @@ function validatePassword(password: string) {
 	if (!hasSpecial) return "Password must include at least one special character";
 	return "";
 }
+
 export async function POST(req: Request) {
 	try {
-		const { firstName, lastName, email, password } = await req.json();
+		const body = await req.json();
+
+		const firstName = String(body.firstName || "").trim();
+		const lastName = String(body.lastName || "").trim();
+		const email = String(body.email || "").trim().toLowerCase();
+		const password = String(body.password || "");
 
 		if (!firstName || !lastName || !email || !password) {
 			return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+		}
+
+		if (firstName.length > 60 || lastName.length > 60 || email.length > 160) {
+			return NextResponse.json({ error: "Input too long" }, { status: 400 });
+		}
+
+		const passwordError = validatePassword(password);
+		if (passwordError) {
+			return NextResponse.json({ error: passwordError }, { status: 400 });
 		}
 
 		const existing = await prisma.user.findUnique({ where: { email } });
