@@ -14,6 +14,7 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
 			count: 1,
 			resetAt: now + windowMs
 		});
+
 		return {
 			ok: true,
 			remaining: limit - 1,

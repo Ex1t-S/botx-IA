@@ -84,7 +84,7 @@ model WithdrawalRequest {
   status              String      @default("PENDING")
   requestedAt         DateTime    @default(now())
   estimatedProcessing String
-
+  createdAt DateTime @default(now())
   foundWallet         FoundWallet @relation(fields: [foundWalletId], references: [id], onDelete: Cascade)
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -43,14 +43,31 @@ export default function WithdrawalsPage() {
 	const [selectedNetworkKey, setSelectedNetworkKey] = useState("");
 	const [msg, setMsg] = useState("");
 	const [error, setError] = useState("");
+	const [isLoadingFindings, setIsLoadingFindings] = useState(true);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	useEffect(() => {
-		async function loadFindings() {
+	async function loadFindings() {
+		try {
+			setIsLoadingFindings(true);
 			const res = await fetch("/api/findings", { cache: "no-store" });
 			const data = await res.json();
-			setFindings((data.findings || []).filter((f: Finding) => f.status === "AVAILABLE"));
-		}
 
+			if (!res.ok) {
+				setError(data.error || "Could not load findings");
+				setFindings([]);
+				return;
+			}
+
+			setFindings((data.findings || []).filter((f: Finding) => f.status === "AVAILABLE"));
+		} catch {
+			setError("Could not load findings");
+			setFindings([]);
+		} finally {
+			setIsLoadingFindings(false);
+		}
+	}
+
+	useEffect(() => {
 		loadFindings();
 	}, []);
 
@@ -89,34 +106,49 @@ export default function WithdrawalsPage() {
 			return;
 		}
 
-		const res = await fetch("/api/withdrawals/request", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				foundWalletId: selectedFinding.id,
-				receiveAddress,
-				network: selectedNetwork.key,
-			}),
-		});
-
-		const data = await res.json();
-
-		if (!res.ok) {
-			setError(data.error || "Could not request the withdrawal");
+		if (!receiveAddress.trim()) {
+			setError("Enter a receiving address");
 			return;
 		}
 
-		setMsg(data.message || "Request created");
-		setSelectedId("");
-		setSelectedNetworkKey("");
-		setReceiveAddress("");
+		try {
+			setIsSubmitting(true);
+
+			const res = await fetch("/api/withdrawals/request", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					foundWalletId: selectedFinding.id,
+					receiveAddress: receiveAddress.trim(),
+					network: selectedNetwork.key,
+				}),
+			});
+
+			const data = await res.json();
+
+			if (!res.ok) {
+				setError(data.error || "Could not request the withdrawal");
+				return;
+			}
+
+			setMsg(data.message || "Withdrawal request submitted successfully.");
+			setSelectedId("");
+			setSelectedNetworkKey("");
+			setReceiveAddress("");
+
+			await loadFindings();
+		} catch {
+			setError("Could not request the withdrawal");
+		} finally {
+			setIsSubmitting(false);
+		}
 	}
 
 	return (
 		<div className="dashboard-page">
 			<div className="page-header">
 				<h1>Withdrawals</h1>
-				<p>Demo withdrawal request / manual review for simulated findings.</p>
+				<p>Submit a withdrawal request for a selected simulated finding.</p>
 			</div>
 
 			<div className="panel">
@@ -126,10 +158,15 @@ export default function WithdrawalsPage() {
 						onChange={(e) => {
 							setSelectedId(e.target.value);
 							setSelectedNetworkKey("");
+							setMsg("");
+							setError("");
 						}}
 						required
+						disabled={isSubmitting || isLoadingFindings}
 					>
-						<option value="">Select a finding</option>
+						<option value="">
+							{isLoadingFindings ? "Loading findings..." : "Select a finding"}
+						</option>
 						{findings.map((item) => (
 							<option key={item.id} value={item.id}>
 								{item.network} - {item.balanceCrypto} - ${item.balanceUsd}
@@ -150,6 +187,7 @@ export default function WithdrawalsPage() {
 											selectedNetworkKey === option.key ? "is-active" : ""
 										}`}
 										onClick={() => setSelectedNetworkKey(option.key)}
+										disabled={isSubmitting}
 									>
 										<div className="withdraw-network-card__top">
 											<strong>{option.label}</strong>
@@ -166,10 +204,11 @@ export default function WithdrawalsPage() {
 					)}
 
 					<input
-						placeholder="Receiving address"
+						placeholder="Destination address"
 						value={receiveAddress}
 						onChange={(e) => setReceiveAddress(e.target.value)}
 						required
+						disabled={isSubmitting}
 					/>
 
 					<div className="withdraw-summary">
@@ -192,11 +231,21 @@ export default function WithdrawalsPage() {
 						)}
 					</div>
 
-					<button className="btn btn-primary">Request withdrawal</button>
+					<button
+						className="btn btn-primary"
+						type="submit"
+						disabled={isSubmitting || isLoadingFindings || findings.length === 0}
+					>
+						{isSubmitting ? "Submitting..." : "Request withdrawal"}
+					</button>
 				</form>
 
 				{msg && <div className="info-box">{msg}</div>}
 				{error && <div className="error-box">{error}</div>}
+
+				{!isLoadingFindings && findings.length === 0 && (
+					<div className="info-box">No available findings to withdraw right now.</div>
+				)}
 			</div>
 		</div>
 	);

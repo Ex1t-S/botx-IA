@@ -113,6 +113,13 @@ export async function POST(req: Request) {
 			foundWallet.balanceCrypto > 0 ? netCrypto / foundWallet.balanceCrypto : 0;
 		const netUsd = Number((foundWallet.balanceUsd * usdRatio).toFixed(2));
 
+		if (netCrypto <= 0 || netUsd <= 0) {
+			return NextResponse.json(
+				{ error: "The available balance is too low for this network fee" },
+				{ status: 400 }
+			);
+		}
+
 		const policy = getWithdrawalPolicy(userLicense?.tier);
 
 		const result = await prisma.$transaction(async (tx) => {
@@ -145,7 +152,7 @@ export async function POST(req: Request) {
 			withdrawal: result,
 		});
 	} catch (error) {
-		console.error("withdrawls/request error", error);
+		console.error("withdrawals/request error", error);
 		return NextResponse.json({ error: "Internal error" }, { status: 500 });
 	}
 }
