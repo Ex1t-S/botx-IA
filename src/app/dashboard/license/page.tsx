@@ -36,6 +36,21 @@ const LICENSE_PLANS = [
 	},
 ];
 
+async function fetchLicenseState(): Promise<LicenseInfo | null> {
+	try {
+		const res = await fetch("/api/machine/state", { cache: "no-store" });
+
+		if (!res.ok) {
+			return null;
+		}
+
+		const data = await res.json();
+		return data.license as LicenseInfo;
+	} catch {
+		return null;
+	}
+}
+
 export default function LicensePage() {
 	const [code, setCode] = useState("");
 	const [msg, setMsg] = useState("");
@@ -50,14 +65,22 @@ export default function LicensePage() {
 		status: "INACTIVE",
 	});
 
-	async function refresh() {
-		const res = await fetch("/api/machine/state", { cache: "no-store" });
-		const data = await res.json();
-		setInfo(data.license);
-	}
-
 	useEffect(() => {
-		refresh();
+		let mounted = true;
+
+		const load = async () => {
+			const license = await fetchLicenseState();
+
+			if (!mounted || !license) return;
+
+			setInfo(license);
+		};
+
+		void load();
+
+		return () => {
+			mounted = false;
+		};
 	}, []);
 
 	async function activate(e: React.FormEvent) {
@@ -65,28 +88,30 @@ export default function LicensePage() {
 		setMsg("");
 		setError("");
 
-		const res = await fetch("/api/license/activate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ code }),
-		});
+		try {
+			const res = await fetch("/api/license/activate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ code }),
+			});
 
-		const data = await res.json();
+			const data = await res.json();
 
-		if (!res.ok) {
-			setError(data.error || "Could not activate license");
-			return;
+			if (!res.ok) {
+				setError(data.error || "Could not activate license");
+				return;
+			}
+
+			setMsg(data.message || "License activated");
+			setCode("");
+
+			const license = await fetchLicenseState();
+			if (license) {
+				setInfo(license);
+			}
+		} catch {
+			setError("Could not activate license");
 		}
-
-		setMsg(data.message || "License activated");
-		setCode("");
-		refresh();
-	}
-
-	function fillCode(planCode: string) {
-		setCode(planCode);
-		setMsg("");
-		setError("");
 	}
 
 	return (
@@ -94,7 +119,8 @@ export default function LicensePage() {
 			<div className="page-header">
 				<h1>License</h1>
 				<p>
-					Activate a plan to power on the machine. If you already have an active one and enter a higher-tier code, your license will be upgraded automatically.
+					Activate a plan to power on the machine. If you already have an active one and
+					enter a higher-tier code, your license will be upgraded automatically.
 				</p>
 			</div>
 
@@ -108,8 +134,6 @@ export default function LicensePage() {
 
 						<p className="license-plan-card__speed">{plan.keysPerMinute}</p>
 						<p className="license-plan-card__description">{plan.description}</p>
-
-						
 					</div>
 				))}
 			</div>
@@ -122,7 +146,9 @@ export default function LicensePage() {
 						onChange={(e) => setCode(e.target.value)}
 						required
 					/>
-					<button className="btn btn-primary">Activate license</button>
+					<button className="btn btn-primary" type="submit">
+						Activate license
+					</button>
 				</form>
 
 				<div className="license-state">

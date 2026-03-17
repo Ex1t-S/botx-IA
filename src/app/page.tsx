@@ -9,14 +9,14 @@ export default function HomePage() {
 			<div className="hero-noise" />
 
 			<div className="hero-brand-logo-wrap">
-	<Image
-		src="/images/botxia-logo.png"
-		alt="BOTX IA"
-		fill
-		className="hero-brand-logo"
-		priority
-	/>
-</div>
+				<Image
+					src="/images/botxia-logo.png"
+					alt="BOTX IA"
+					fill
+					className="hero-brand-logo"
+					priority
+				/>
+			</div>
 
 			<div className="hero-shell">
 				<header className="hero-header">
@@ -116,7 +116,8 @@ export default function HomePage() {
 							<p>Pro — USD 200 — 10,000 keys/min</p>
 							<p>Ultra — USD 500 — 35,000 keys/min</p>
 							<p>
-The wallets and balances found are for the exclusive use of the user, and their use is the user's sole responsibility.
+								The wallets and balances found are for the exclusive use of the user, and
+								their use is the user&apos;s sole responsibility.
 							</p>
 
 							<Link href="/contact" className="inline-link">

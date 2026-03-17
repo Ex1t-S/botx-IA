@@ -24,9 +24,9 @@ export default function ContactPage() {
 
 				<section className="contact-card">
 					<div className="section-badge">Contact</div>
-					<h1>Let's talk about the project</h1>
+					<h1>Let&apos;s talk about the project</h1>
 					<p>
-						If you want to ask about the demo, the architecture, or the academic delivery, you can use this section as the system's informational contact area.
+						If you want to ask about the demo, the architecture, or the academic delivery, you can use this section as the system&apos;s informational contact area.
 					</p>
 
 					<div className="contact-grid">

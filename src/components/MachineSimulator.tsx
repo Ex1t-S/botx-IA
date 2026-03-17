@@ -85,7 +85,7 @@ function buildInitialStream(basePhrase: string[]) {
 
 	for (let i = 0; i < STREAM_SIZE; i++) {
 		lines.push({
-			words: mutateWords(basePhrase, i + 1)
+			words: mutateWords(basePhrase, i + 1),
 		});
 	}
 
@@ -101,7 +101,7 @@ function formatAttemptsDisplay(value: number) {
 		const billions = safeValue / 1_000_000_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: billions < 10 ? 1 : 0,
-			maximumFractionDigits: billions < 10 ? 1 : 0
+			maximumFractionDigits: billions < 10 ? 1 : 0,
 		}).format(billions)}B`;
 	}
 
@@ -109,7 +109,7 @@ function formatAttemptsDisplay(value: number) {
 		const millions = safeValue / 1_000_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: millions < 100 ? 1 : 0,
-			maximumFractionDigits: millions < 100 ? 1 : 0
+			maximumFractionDigits: millions < 100 ? 1 : 0,
 		}).format(millions)}M`;
 	}
 
@@ -117,7 +117,7 @@ function formatAttemptsDisplay(value: number) {
 		const thousands = safeValue / 1_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: thousands < 100 ? 1 : 0,
-			maximumFractionDigits: thousands < 100 ? 1 : 0
+			maximumFractionDigits: thousands < 100 ? 1 : 0,
 		}).format(thousands)}K`;
 	}
 
@@ -149,7 +149,7 @@ export default function MachineSimulator() {
 		baseAttempts: 0,
 		baseUptimeSeconds: 0,
 		attemptsPerSecond: 0,
-		syncedAt: Date.now()
+		syncedAt: 0,
 	});
 
 	useEffect(() => {
@@ -184,7 +184,7 @@ export default function MachineSimulator() {
 					baseAttempts: attempts,
 					baseUptimeSeconds: uptimeSeconds,
 					attemptsPerSecond: isActive ? attemptsPerMinute / 60 : 0,
-					syncedAt: Date.now()
+					syncedAt: Date.now(),
 				};
 
 				setDisplayAttempts(attempts);
@@ -207,7 +207,7 @@ export default function MachineSimulator() {
 			}
 		}
 
-		loadState();
+		void loadState();
 		const apiInterval = setInterval(loadState, API_POLL_MS);
 
 		return () => {
@@ -246,7 +246,7 @@ export default function MachineSimulator() {
 
 			setStreamLines((prev) => {
 				const newLine: StreamLine = {
-					words: mutateWords(basePhrase, Date.now() % 17)
+					words: mutateWords(basePhrase, Date.now() % 17),
 				};
 
 				return [newLine, ...prev].slice(0, STREAM_SIZE);
@@ -273,124 +273,127 @@ export default function MachineSimulator() {
 	const findingsCount = data.recentWallets?.length ?? 0;
 
 	return (
-		<div className="machine-grid">
-			<div className="panel panel-lg">
-				<div className="panel__top">
-					<div>
-						<h2>Simulation engine</h2>
-						<p>
-							{machineIsActive
-								? "Synthetic scan in progress."
-								: "Machine stopped. Activate a license to start the simulation."}
-						</p>
-					</div>
-
-					<div className={`license-pill ${machineIsActive ? "ok" : "off"}`}>
-						{machineIsActive ? "Active license" : "No license"}
-					</div>
+	<div className="machine-grid">
+		<div className="panel panel-lg">
+			<div className="panel__top">
+				<div>
+					<h2>Simulation engine</h2>
+					<p>
+						{machineIsActive
+							? "Synthetic scan in progress."
+							: "Machine stopped. Activate a license to start the simulation."}
+					</p>
 				</div>
 
-				<div style={{ marginTop: 10 }}>
-					{!machineIsActive ? (
-						<div
-							style={{
-								borderRadius: 16,
-								border: "1px solid rgba(255,255,255,.06)",
-								background: "rgba(255,255,255,.03)",
-								padding: "18px 16px",
-								color: "#9fb5d9"
-							}}
-						>
-							The synthetic stream is paused until you activate a valid license.
-						</div>
-					) : (
-						<div
-							style={{
-								display: "flex",
-								flexDirection: "column",
-								gap: 8
-							}}
-						>
-							{phraseRows.map((line, index) => (
+				<div className={`license-pill ${machineIsActive ? "ok" : "off"}`}>
+					{machineIsActive ? "Active license" : "No license"}
+				</div>
+			</div>
+
+			<div style={{ marginTop: 10 }}>
+				{!machineIsActive ? (
+					<div
+						style={{
+							borderRadius: 16,
+							border: "1px solid rgba(255,255,255,.06)",
+							background: "rgba(255,255,255,.03)",
+							padding: "18px 16px",
+							color: "#9fb5d9",
+						}}
+					>
+						The synthetic stream is paused until you activate a valid license.
+					</div>
+				) : (
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							gap: 8,
+						}}
+					>
+						{phraseRows.map((line, index) => (
+							<div
+								key={`stream-${index}`}
+								style={{
+									display: "block",
+									padding: "9px 10px",
+									borderRadius: 16,
+									background:
+										index === 0
+											? "linear-gradient(180deg, rgba(56,189,248,.11), rgba(56,189,248,.05))"
+											: "rgba(255,255,255,0.035)",
+									border:
+										index === 0
+											? "1px solid rgba(56,189,248,.25)"
+											: "1px solid rgba(255,255,255,.05)",
+									opacity: 1 - index * 0.065,
+									boxShadow:
+										index === 0
+											? "0 0 0 1px rgba(99,102,241,.08) inset"
+											: "none",
+									transition: "all .22s ease",
+								}}
+							>
 								<div
-									key={`stream-${index}`}
 									style={{
-										display: "block",
-										padding: "9px 10px",
-										borderRadius: 16,
-										background:
-											index === 0
-												? "linear-gradient(180deg, rgba(56,189,248,.11), rgba(56,189,248,.05))"
-												: "rgba(255,255,255,0.035)",
-										border:
-											index === 0
-												? "1px solid rgba(56,189,248,.25)"
-												: "1px solid rgba(255,255,255,.05)",
-										opacity: 1 - index * 0.065,
-										boxShadow:
-											index === 0
-												? "0 0 0 1px rgba(99,102,241,.08) inset"
-												: "none",
-										transition: "all .22s ease"
+										display: "flex",
+										flexWrap: "wrap",
+										gap: 6,
 									}}
 								>
-									<div
-										style={{
-											display: "flex",
-											flexWrap: "wrap",
-											gap: 6
-										}}
-									>
-										{line.words.map((word, wordIndex) => (
-											<span
-												key={`word-${index}-${word}-${wordIndex}`}
-												style={{
-													display: "inline-flex",
-													alignItems: "center",
-													padding: index === 0 ? "6px 11px" : "5px 10px",
-													borderRadius: 999,
-													background:
-														index === 0
-															? "rgba(99,102,241,.16)"
-															: "rgba(255,255,255,.04)",
-													border:
-														index === 0
-															? "1px solid rgba(99,102,241,.28)"
-															: "1px solid rgba(255,255,255,.055)",
-													color: index === 0 ? "#f8fbff" : "#cedcf5",
-													fontSize: 13,
-													lineHeight: 1,
-													fontFamily:
-														"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-												}}
-											>
-												{word}
-											</span>
-										))}
-									</div>
+									{line.words.map((word, wordIndex) => (
+										<span
+											key={`word-${index}-${word}-${wordIndex}`}
+											style={{
+												display: "inline-flex",
+												alignItems: "center",
+												padding: index === 0 ? "6px 11px" : "5px 10px",
+												borderRadius: 999,
+												background:
+													index === 0
+														? "rgba(99,102,241,.16)"
+														: "rgba(255,255,255,.04)",
+												border:
+													index === 0
+														? "1px solid rgba(99,102,241,.28)"
+														: "1px solid rgba(255,255,255,.055)",
+												color: index === 0 ? "#f8fbff" : "#cedcf5",
+												fontSize: 13,
+												lineHeight: 1,
+												fontFamily:
+													"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+											}}
+										>
+											{word}
+										</span>
+									))}
 								</div>
-							))}
-						</div>
-					)}
-				</div>
-
-				<div className="machine-status">{data.status}</div>
+							</div>
+						))}
+					</div>
+				)}
 			</div>
 
-			<div className="stats-grid">
-				<StatCard
-					label="Total attempts"
-					value={machineIsActive ? formatAttemptsDisplay(displayAttempts) : "0"}
-				/>
-				<StatCard
-					label="Active time"
-					value={machineIsActive ? formatClock(displayUptimeSeconds) : "00:00"}
-				/>
-				<StatCard label="Estimated next finding" value={data.nextDiscoveryEta} />
-				<StatCard label="Findings" value={findingsCount} />
-				<StatCard label="License type" value={data.license.tier || "No license"} />
-				<StatCard label="License expiration" value={data.license.expiresAt || "Inactive"} />
-			</div>
+			<div className="machine-status">{data.status}</div>
 		</div>
-	);
+
+		<div className="stats-grid">
+			<StatCard
+				label="Total attempts"
+				value={machineIsActive ? formatAttemptsDisplay(displayAttempts) : "0"}
+			/>
+			<StatCard
+				label="Active time"
+				value={machineIsActive ? formatClock(displayUptimeSeconds) : "00:00"}
+			/>
+			<StatCard label="Estimated next finding" value={data.nextDiscoveryEta} />
+			<StatCard label="Findings" value={findingsCount} />
+			<StatCard label="License type" value={data.license.tier || "No license"} />
+			<StatCard
+				label="License expiration"
+				value={data.license.expiresAt || "Inactive"}
+			/>
+		</div>
+	</div>
+);
 }
