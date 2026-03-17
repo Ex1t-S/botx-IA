@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { createToken, hashPassword, setAuthCookie } from "../../../../lib/auth";
+import { rateLimit } from "../../../../lib/rate-limit";
+import { getClientIp, isAllowedOrigin } from "../../../../lib/request";
 
 function validatePassword(password: string) {
 	const hasUpper = /[A-Z]/.test(password);
@@ -16,8 +18,23 @@ function validatePassword(password: string) {
 	return "";
 }
 
+function isValidEmail(email: string) {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export async function POST(req: Request) {
 	try {
+		if (!isAllowedOrigin(req)) {
+			return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
+		}
+
+		const ip = getClientIp(req);
+		const limit = rateLimit(`register:ip:${ip}`, 5, 30 * 60 * 1000);
+
+		if (!limit.ok) {
+			return NextResponse.json({ error: "Too many registrations" }, { status: 429 });
+		}
+
 		const body = await req.json();
 
 		const firstName = String(body.firstName || "").trim();
@@ -27,6 +44,10 @@ export async function POST(req: Request) {
 
 		if (!firstName || !lastName || !email || !password) {
 			return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+		}
+
+		if (!isValidEmail(email)) {
+			return NextResponse.json({ error: "Invalid email" }, { status: 400 });
 		}
 
 		if (firstName.length > 60 || lastName.length > 60 || email.length > 160) {
@@ -51,8 +72,8 @@ export async function POST(req: Request) {
 				firstName,
 				lastName,
 				email,
-				passwordHash,
-			},
+				passwordHash
+			}
 		});
 
 		await prisma.license.create({
@@ -62,8 +83,8 @@ export async function POST(req: Request) {
 				priceUsd: 50,
 				keysPerMinute: 1000,
 				machineEnabled: false,
-				status: "INACTIVE",
-			},
+				status: "INACTIVE"
+			}
 		});
 
 		const token = await createToken({ userId: user.id, email: user.email });

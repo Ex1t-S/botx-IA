@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserFromCookie } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
+import { rateLimit } from "../../../../lib/rate-limit";
+import { isAllowedOrigin } from "../../../../lib/request";
 
 const NETWORK_OPTIONS: Record<string, { key: string; feeCrypto: number }[]> = {
 	BTC: [
@@ -30,18 +32,38 @@ function getWithdrawalPolicy(tier: string | null | undefined) {
 	};
 }
 
+function normalizeString(value: unknown) {
+	return String(value || "").trim();
+}
+
 export async function POST(req: Request) {
 	try {
+		if (!isAllowedOrigin(req)) {
+			return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
+		}
+
 		const session = await getCurrentUserFromCookie();
 
 		if (!session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const { foundWalletId, receiveAddress, network } = await req.json();
+		const limit = rateLimit(`withdrawal:${session.userId}`, 8, 15 * 60 * 1000);
+		if (!limit.ok) {
+			return NextResponse.json({ error: "Too many withdrawal requests" }, { status: 429 });
+		}
+
+		const body = await req.json();
+		const foundWalletId = normalizeString(body.foundWalletId);
+		const receiveAddress = normalizeString(body.receiveAddress);
+		const network = normalizeString(body.network).toUpperCase();
 
 		if (!foundWalletId || !receiveAddress || !network) {
 			return NextResponse.json({ error: "Missing data to request the withdrawal" }, { status: 400 });
+		}
+
+		if (receiveAddress.length < 8 || receiveAddress.length > 120) {
+			return NextResponse.json({ error: "Invalid receiving address" }, { status: 400 });
 		}
 
 		const userLicense = await prisma.license.findUnique({
@@ -70,6 +92,22 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: "Invalid withdrawal network for this asset" }, { status: 400 });
 		}
 
+		const recentDuplicate = await prisma.withdrawalRequest.findFirst({
+			where: {
+				userId: session.userId,
+				foundWalletId: foundWallet.id,
+				receiveAddress,
+				network,
+				createdAt: {
+					gte: new Date(Date.now() - 5 * 60 * 1000),
+				},
+			},
+		});
+
+		if (recentDuplicate) {
+			return NextResponse.json({ error: "Duplicate request detected" }, { status: 409 });
+		}
+
 		const netCrypto = Math.max(0, foundWallet.balanceCrypto - selectedNetwork.feeCrypto);
 		const usdRatio =
 			foundWallet.balanceCrypto > 0 ? netCrypto / foundWallet.balanceCrypto : 0;
@@ -77,22 +115,26 @@ export async function POST(req: Request) {
 
 		const policy = getWithdrawalPolicy(userLicense?.tier);
 
-		const withdrawal = await prisma.withdrawalRequest.create({
-			data: {
-				userId: session.userId,
-				foundWalletId: foundWallet.id,
-				network,
-				receiveAddress,
-				amountCrypto: netCrypto,
-				amountUsd: netUsd,
-				status: "PENDING",
-				estimatedProcessing: policy.estimatedProcessing,
-			},
-		});
+		const result = await prisma.$transaction(async (tx) => {
+			const withdrawal = await tx.withdrawalRequest.create({
+				data: {
+					userId: session.userId,
+					foundWalletId: foundWallet.id,
+					network,
+					receiveAddress,
+					amountCrypto: netCrypto,
+					amountUsd: netUsd,
+					status: "PENDING",
+					estimatedProcessing: policy.estimatedProcessing,
+				},
+			});
 
-		await prisma.foundWallet.update({
-			where: { id: foundWallet.id },
-			data: { status: "REQUESTED" },
+			await tx.foundWallet.update({
+				where: { id: foundWallet.id },
+				data: { status: "REQUESTED" },
+			});
+
+			return withdrawal;
 		});
 
 		return NextResponse.json({
@@ -100,9 +142,10 @@ export async function POST(req: Request) {
 				policy.mode === "DAILY"
 					? "Daily withdrawal request created. Estimated processing time: 1 to 12 hours."
 					: "Weekly withdrawal request created. Estimated processing time: 1 to 3 days.",
-			withdrawal,
+			withdrawal: result,
 		});
-	} catch {
+	} catch (error) {
+		console.error("withdrawls/request error", error);
 		return NextResponse.json({ error: "Internal error" }, { status: 500 });
 	}
 }
