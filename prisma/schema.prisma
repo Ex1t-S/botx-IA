@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String              @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String              @unique
+  passwordHash String
+  createdAt    DateTime            @default(now())
+  scanAttempts Int                 @default(0)
+
+  foundWallets FoundWallet[]
+  license      License?
+  withdrawals  WithdrawalRequest[]
+}
+
+model License {
+  id                     String            @id @default(cuid())
+  userId                 String            @unique
+  activatedAt            DateTime?
+  expiresAt              DateTime?
+  status                 String            @default("INACTIVE")
+  keysPerMinute          Int               @default(1200)
+  machineEnabled         Boolean           @default(false)
+  priceUsd               Int               @default(50)
+  simulatedRoi           Float?
+  tier                   String            @default("STARTER")
+  lastProcessedMilestone Int               @default(0)
+  code                   String?           @unique
+  createdAt              DateTime          @default(now())
+  inventoryId            String?           @unique
+
+  user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventory              LicenseInventory? @relation(fields: [inventoryId], references: [id])
+}
+
+model LicenseInventory {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  tier             String
+  priceUsd         Int
+  keysPerMinute    Int
+  durationDays     Int       @default(7)
+  rank             Int
+  status           String    @default("AVAILABLE")
+  assignedToUserId String?
+  activatedAt      DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  license          License?
+}
+
+model FoundWallet {
+  id               String              @id @default(cuid())
+  userId           String
+  network          String
+  address          String
+  balanceCrypto    Float
+  balanceUsd       Float
+  foundAt          DateTime            @default(now())
+  status           String              @default("AVAILABLE")
+  priceSnapshotUsd Float?
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawals      WithdrawalRequest[]
+}
+
+model WithdrawalRequest {
+  id                  String      @id @default(cuid())
+  userId              String
+  foundWalletId       String
+  network             String
+  receiveAddress      String
+  amountCrypto        Float
+  amountUsd           Float
+  status              String      @default("PENDING")
+  requestedAt         DateTime    @default(now())
+  estimatedProcessing String
+
+  foundWallet         FoundWallet @relation(fields: [foundWalletId], references: [id], onDelete: Cascade)
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
