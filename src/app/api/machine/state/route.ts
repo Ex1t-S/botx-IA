@@ -3,8 +3,68 @@ import { getCurrentUserFromCookie } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { generateFakeWallet, getMachineState } from "../../../../lib/machine";
 import { getMarketPrices } from "../../../../lib/market";
+import { rateLimit } from "../../../../lib/rate-limit";
 
-const MILESTONE_SIZE = 10_000_000;
+const DISCOVERY_BLOCK_SIZE = 100_000;
+const DISCOVERY_CHANCE_PER_BLOCK = 0.2;
+const RECENT_WALLETS_LIMIT = 10;
+
+function formatDurationCompact(totalSeconds: number) {
+	if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+		return "~0s";
+	}
+
+	const days = Math.floor(totalSeconds / 86400);
+	const hours = Math.floor((totalSeconds % 86400) / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = Math.floor(totalSeconds % 60);
+
+	if (days > 0) return `~${days}d ${hours}h`;
+	if (hours > 0) return `~${hours}h ${minutes}m`;
+	if (minutes > 0) return `~${minutes}m ${seconds}s`;
+	return `~${seconds}s`;
+}
+
+function buildNextDiscoveryEta(totalAttempts: number, keysPerMinute: number) {
+	if (!Number.isFinite(keysPerMinute) || keysPerMinute <= 0) {
+		return "Inactive";
+	}
+
+	const attemptsPerSecond = keysPerMinute / 60;
+	if (attemptsPerSecond <= 0) {
+		return "Inactive";
+	}
+
+	const attemptsIntoCurrentBlock = totalAttempts % DISCOVERY_BLOCK_SIZE;
+	const attemptsUntilNextRoll =
+		attemptsIntoCurrentBlock === 0
+			? DISCOVERY_BLOCK_SIZE
+			: DISCOVERY_BLOCK_SIZE - attemptsIntoCurrentBlock;
+
+	const expectedRollsToSuccess = 1 / DISCOVERY_CHANCE_PER_BLOCK; // 5
+	const expectedAdditionalAttemptsAfterNextRoll =
+		Math.max(0, expectedRollsToSuccess - 1) * DISCOVERY_BLOCK_SIZE;
+
+	const expectedAttempts =
+		attemptsUntilNextRoll + expectedAdditionalAttemptsAfterNextRoll;
+
+	const expectedSeconds = Math.ceil(expectedAttempts / attemptsPerSecond);
+
+	return formatDurationCompact(expectedSeconds);
+}
+
+function formatClock(totalSeconds: number) {
+	const safe = Math.max(0, Math.floor(totalSeconds));
+	const hours = Math.floor(safe / 3600);
+	const minutes = Math.floor((safe % 3600) / 60);
+	const seconds = safe % 60;
+
+	if (hours > 0) {
+		return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+	}
+
+	return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
 
 export async function GET() {
 	try {
@@ -12,6 +72,11 @@ export async function GET() {
 
 		if (!session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const machineLimit = rateLimit(`machine:${session.userId}`, 30, 60 * 1000);
+		if (!machineLimit.ok) {
+			return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 		}
 
 		const [user, license] = await Promise.all([
@@ -44,6 +109,9 @@ export async function GET() {
 					machineEnabled: false
 				}
 			});
+
+			license.status = "EXPIRED";
+			license.machineEnabled = false;
 		}
 
 		const isActive = Boolean(
@@ -55,6 +123,8 @@ export async function GET() {
 		);
 
 		let totalAttempts = 0;
+		let uptimeSeconds = 0;
+
 		let newWallet: null | {
 			id: string;
 			network: string;
@@ -66,12 +136,17 @@ export async function GET() {
 		} = null;
 
 		if (isActive && license.activatedAt) {
-			const elapsedMs =
-				now.getTime() - new Date(license.activatedAt).getTime();
-			const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / 60000));
+			const elapsedMs = Math.max(
+				0,
+				now.getTime() - new Date(license.activatedAt).getTime()
+			);
 
-			totalAttempts =
-				elapsedMinutes * Math.max(0, license.keysPerMinute ?? 0);
+			uptimeSeconds = Math.floor(elapsedMs / 1000);
+
+			const keysPerMinute = Math.max(0, license.keysPerMinute ?? 0);
+			const attemptsPerSecond = keysPerMinute / 60;
+
+			totalAttempts = Math.floor(uptimeSeconds * attemptsPerSecond);
 
 			if (user.scanAttempts !== totalAttempts) {
 				await prisma.user.update({
@@ -82,20 +157,32 @@ export async function GET() {
 				});
 			}
 
-			const currentMilestone = Math.floor(totalAttempts / MILESTONE_SIZE);
-			const lastProcessedMilestone = Math.max(
+			const currentProcessedBlock = Math.floor(
+				totalAttempts / DISCOVERY_BLOCK_SIZE
+			);
+			const lastProcessedBlock = Math.max(
 				0,
 				license.lastProcessedMilestone ?? 0
 			);
 
-			if (currentMilestone > lastProcessedMilestone) {
-				const prices = await getMarketPrices();
+			if (currentProcessedBlock > lastProcessedBlock) {
+				let prices: Awaited<ReturnType<typeof getMarketPrices>> | null = null;
 
 				for (
-					let milestone = lastProcessedMilestone + 1;
-					milestone <= currentMilestone;
-					milestone++
+					let block = lastProcessedBlock + 1;
+					block <= currentProcessedBlock;
+					block++
 				) {
+					const roll = Math.random();
+
+					if (roll > DISCOVERY_CHANCE_PER_BLOCK) {
+						continue;
+					}
+
+					if (!prices) {
+						prices = await getMarketPrices();
+					}
+
 					const wallet = generateFakeWallet(prices);
 
 					const existing = await prisma.foundWallet.findFirst({
@@ -116,9 +203,7 @@ export async function GET() {
 					}
 
 					const balanceCrypto = Number(wallet.balance);
-					const balanceUsd = Number(
-						(balanceCrypto * usdPrice).toFixed(2)
-					);
+					const balanceUsd = Number((balanceCrypto * usdPrice).toFixed(2));
 
 					if (!Number.isFinite(balanceCrypto) || balanceCrypto <= 0) {
 						continue;
@@ -154,15 +239,16 @@ export async function GET() {
 				await prisma.license.update({
 					where: { id: license.id },
 					data: {
-						lastProcessedMilestone: currentMilestone
+						lastProcessedMilestone: currentProcessedBlock
 					}
 				});
 			}
 		}
 
-		const allWallets = await prisma.foundWallet.findMany({
+		const recentWallets = await prisma.foundWallet.findMany({
 			where: { userId: session.userId },
-			orderBy: { foundAt: "desc" }
+			orderBy: { foundAt: "desc" },
+			take: RECENT_WALLETS_LIMIT
 		});
 
 		const state = getMachineState({
@@ -175,9 +261,17 @@ export async function GET() {
 
 		return NextResponse.json({
 			...state,
+			attemptsPerMinute: isActive ? license.keysPerMinute ?? 0 : 0,
 			totalAttempts,
+			uptimeSeconds,
+			uptimeHours: Number((uptimeSeconds / 3600).toFixed(2)),
+			uptimeText: formatClock(uptimeSeconds),
+			nextDiscoveryEta: isActive
+				? buildNextDiscoveryEta(totalAttempts, license.keysPerMinute ?? 0)
+				: "Inactive",
+			serverNow: now.toISOString(),
 			wallet: newWallet,
-			recentWallets: allWallets.map((item) => ({
+			recentWallets: recentWallets.map((item) => ({
 				id: item.id,
 				network: item.network,
 				address: item.address,

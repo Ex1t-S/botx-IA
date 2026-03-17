@@ -20,9 +20,11 @@ type MachineResponse = {
 	attemptsPerMinute?: number;
 	totalAttempts?: number;
 	uptimeHours: number;
+	uptimeSeconds?: number;
 	uptimeText?: string;
 	status: string;
 	nextDiscoveryEta: string;
+	serverNow?: string;
 	wallet: WalletItem | null;
 	recentWallets?: WalletItem[];
 	license: {
@@ -39,8 +41,17 @@ type StreamLine = {
 	words: string[];
 };
 
+type LiveCounters = {
+	baseAttempts: number;
+	baseUptimeSeconds: number;
+	attemptsPerSecond: number;
+	syncedAt: number;
+};
+
 const STREAM_SIZE = 10;
 const CASCADE_MS = 700;
+const API_POLL_MS = 4000;
+const COUNTER_TICK_MS = 250;
 
 function rotateWords(words: string[], shift: number) {
 	if (!words.length) return [];
@@ -84,39 +95,62 @@ function buildInitialStream(basePhrase: string[]) {
 function formatAttemptsDisplay(value: number) {
 	if (!Number.isFinite(value) || value <= 0) return "0";
 
-	if (value >= 1_000_000_000) {
-		const billions = value / 1_000_000_000;
+	const safeValue = Math.floor(value);
+
+	if (safeValue >= 1_000_000_000) {
+		const billions = safeValue / 1_000_000_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: billions < 10 ? 1 : 0,
 			maximumFractionDigits: billions < 10 ? 1 : 0
 		}).format(billions)}B`;
 	}
 
-	if (value >= 1_000_000) {
-		const millions = value / 1_000_000;
+	if (safeValue >= 1_000_000) {
+		const millions = safeValue / 1_000_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: millions < 100 ? 1 : 0,
 			maximumFractionDigits: millions < 100 ? 1 : 0
 		}).format(millions)}M`;
 	}
 
-	if (value >= 1_000) {
-		const thousands = value / 1_000;
+	if (safeValue >= 1_000) {
+		const thousands = safeValue / 1_000;
 		return `${new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: thousands < 100 ? 1 : 0,
 			maximumFractionDigits: thousands < 100 ? 1 : 0
 		}).format(thousands)}K`;
 	}
 
-	return value.toLocaleString("en-US");
+	return safeValue.toLocaleString("en-US");
+}
+
+function formatClock(totalSeconds: number) {
+	const safe = Math.max(0, Math.floor(totalSeconds));
+	const hours = Math.floor(safe / 3600);
+	const minutes = Math.floor((safe % 3600) / 60);
+	const seconds = safe % 60;
+
+	if (hours > 0) {
+		return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+	}
+
+	return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 export default function MachineSimulator() {
 	const [data, setData] = useState<MachineResponse | null>(null);
 	const [streamLines, setStreamLines] = useState<StreamLine[]>([]);
 	const [basePhrase, setBasePhrase] = useState<string[]>([]);
+	const [displayAttempts, setDisplayAttempts] = useState(0);
+	const [displayUptimeSeconds, setDisplayUptimeSeconds] = useState(0);
 
 	const latestDataRef = useRef<MachineResponse | null>(null);
+	const liveCountersRef = useRef<LiveCounters>({
+		baseAttempts: 0,
+		baseUptimeSeconds: 0,
+		attemptsPerSecond: 0,
+		syncedAt: Date.now()
+	});
 
 	useEffect(() => {
 		latestDataRef.current = data;
@@ -141,6 +175,20 @@ export default function MachineSimulator() {
 				setData(json);
 
 				const isActive = Boolean(json.license?.active);
+				const attempts = json.totalAttempts ?? 0;
+				const uptimeSeconds = json.uptimeSeconds ?? 0;
+				const attemptsPerMinute =
+					json.attemptsPerMinute ?? json.license?.keysPerMinute ?? 0;
+
+				liveCountersRef.current = {
+					baseAttempts: attempts,
+					baseUptimeSeconds: uptimeSeconds,
+					attemptsPerSecond: isActive ? attemptsPerMinute / 60 : 0,
+					syncedAt: Date.now()
+				};
+
+				setDisplayAttempts(attempts);
+				setDisplayUptimeSeconds(uptimeSeconds);
 
 				if (!isActive) {
 					setBasePhrase([]);
@@ -160,12 +208,34 @@ export default function MachineSimulator() {
 		}
 
 		loadState();
-		const apiInterval = setInterval(loadState, 4000);
+		const apiInterval = setInterval(loadState, API_POLL_MS);
 
 		return () => {
 			mounted = false;
 			clearInterval(apiInterval);
 		};
+	}, []);
+
+	useEffect(() => {
+		const counterInterval = setInterval(() => {
+			const current = latestDataRef.current;
+			const live = liveCountersRef.current;
+
+			if (!current || !current.license?.active) {
+				setDisplayAttempts(current?.totalAttempts ?? 0);
+				setDisplayUptimeSeconds(current?.uptimeSeconds ?? 0);
+				return;
+			}
+
+			const elapsedSeconds = Math.max(0, (Date.now() - live.syncedAt) / 1000);
+			const nextAttempts = live.baseAttempts + elapsedSeconds * live.attemptsPerSecond;
+			const nextUptime = live.baseUptimeSeconds + elapsedSeconds;
+
+			setDisplayAttempts(nextAttempts);
+			setDisplayUptimeSeconds(nextUptime);
+		}, COUNTER_TICK_MS);
+
+		return () => clearInterval(counterInterval);
 	}, []);
 
 	useEffect(() => {
@@ -201,7 +271,6 @@ export default function MachineSimulator() {
 
 	const machineIsActive = Boolean(data.license?.active);
 	const findingsCount = data.recentWallets?.length ?? 0;
-	const totalAttempts = data.totalAttempts ?? 0;
 
 	return (
 		<div className="machine-grid">
@@ -311,9 +380,12 @@ export default function MachineSimulator() {
 			<div className="stats-grid">
 				<StatCard
 					label="Total attempts"
-					value={machineIsActive ? formatAttemptsDisplay(totalAttempts) : "0"}
+					value={machineIsActive ? formatAttemptsDisplay(displayAttempts) : "0"}
 				/>
-				<StatCard label="Active hours" value={machineIsActive ? data.uptimeHours : 0} />
+				<StatCard
+					label="Active time"
+					value={machineIsActive ? formatClock(displayUptimeSeconds) : "00:00"}
+				/>
 				<StatCard label="Estimated next finding" value={data.nextDiscoveryEta} />
 				<StatCard label="Findings" value={findingsCount} />
 				<StatCard label="License type" value={data.license.tier || "No license"} />
