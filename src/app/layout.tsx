@@ -6,9 +6,9 @@ export const metadata: Metadata = {
 	title: "BOTX",
 	description: "Search dead wallets cryptocurrency, best in the market",
 	icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: "/images/favicon.png",
+    shortcut: "/images/favicon.png",
+    apple: "/images/favicon.png",
   },
 };
 
