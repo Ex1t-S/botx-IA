@@ -3,8 +3,13 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-	title: "Wallet Simulator Demo",
-	description: "Academic simulation of licensing and a fictional visual scanning engine"
+	title: "BOTX",
+	description: "Search dead wallets cryptocurrency, best in the market",
+	icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
