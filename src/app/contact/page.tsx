@@ -26,28 +26,52 @@ export default function ContactPage() {
 					<div className="section-badge">Contact</div>
 					<h1>Let&apos;s talk about the project</h1>
 					<p>
-						If you want to ask about the demo, the architecture, or the academic delivery, you can use this section as the system&apos;s informational contact area.
+						If you want to ask about the Botx IA, informational contact area.
 					</p>
 
 					<div className="contact-grid">
 						<div className="contact-box">
 							<span>Email</span>
-							<strong>contacto@botxia-demo.com</strong>
+							<strong>botxiabt@hotmail.com</strong>
+						</div>
+
+						<div className="contact-box">
+						<span>Social media</span>
+
+						<div className="social-links">
+							<a
+								href="https://www.instagram.com/botx_ia/"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="contact-link"
+							>
+								Instagram
+							</a>
+
+							<a
+								href="https://x.com/botx_ia"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="contact-link"
+							>
+								Twitter / X
+							</a>
+						</div>
 						</div>
 
 						<div className="contact-box">
 							<span>Location</span>
-							<strong>La Plata, Buenos Aires</strong>
+							<strong>United Arab Emirates</strong>
 						</div>
 
 						<div className="contact-box">
 							<span>Project</span>
-							<strong>Educational simulation of licenses and a synthetic engine</strong>
+							<strong>botx ia phrase recovery seeds with brute force</strong>
 						</div>
 
 						<div className="contact-box">
 							<span>Status</span>
-							<strong>Academic demo active</strong>
+							<strong>Killing 2.0 motor</strong>
 						</div>
 					</div>
 

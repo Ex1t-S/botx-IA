@@ -1,7 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getCurrentUserFromCookie } from "../lib/auth";
 
-export default function HomePage() {
+export default async function HomePage() {
+	const user = await getCurrentUserFromCookie();
+
 	return (
 		<main className="hero-page">
 			<div className="hero-bg hero-bg--one" />
@@ -21,16 +24,27 @@ export default function HomePage() {
 			<div className="hero-shell">
 				<header className="hero-header">
 					<div />
+
 					<nav className="top-nav">
 						<Link href="/contact" className="nav-link">
 							Contact
 						</Link>
-						<Link href="/login" className="nav-link">
-							Login
-						</Link>
-						<Link href="/register" className="nav-link nav-link--primary">
-							Register
-						</Link>
+
+						{user ? (
+							<Link href="/dashboard" className="nav-link nav-link--primary">
+								Menu
+							</Link>
+						) : (
+							<>
+								<Link href="/login" className="nav-link">
+									Login
+								</Link>
+
+								<Link href="/register" className="nav-link nav-link--primary">
+									Register
+								</Link>
+							</>
+						)}
 					</nav>
 				</header>
 
@@ -78,18 +92,18 @@ export default function HomePage() {
 							</div>
 
 							<div className="scan-grid">
-								<span>lorvex</span>
-								<span>tanori</span>
-								<span>pelmuk</span>
-								<span>zafrin</span>
-								<span>morlek</span>
-								<span>vintar</span>
-								<span>xelmon</span>
-								<span>parvok</span>
-								<span>niltre</span>
-								<span>zormia</span>
-								<span>caldrix</span>
-								<span>fernox</span>
+								<span>actor</span>
+								<span>bachelor</span>
+								<span>easily</span>
+								<span>gap</span>
+								<span>identify</span>
+								<span>magnet</span>
+								<span>napkin</span>
+								<span>cake</span>
+								<span>paddle</span>
+								<span>raccoon</span>
+								<span>pigeon</span>
+								<span>saddle</span>
 							</div>
 
 							<div className="scan-status">
@@ -112,9 +126,11 @@ export default function HomePage() {
 
 						<div className="info-card">
 							<h3>License plans</h3>
+
 							<p>Starter — USD 50 — 1,000 keys/min</p>
 							<p>Pro — USD 200 — 10,000 keys/min</p>
 							<p>Ultra — USD 500 — 35,000 keys/min</p>
+
 							<p>
 								The wallets and balances found are for the exclusive use of the user, and
 								their use is the user&apos;s sole responsibility.

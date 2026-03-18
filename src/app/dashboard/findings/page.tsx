@@ -31,7 +31,7 @@ export default function FindingsPage() {
 		<div className="dashboard-page">
 			<div className="page-header">
 				<h1>Findings</h1>
-				<p>Fictional wallets found by the simulation.</p>
+				<p>Wallets found by Killing.</p>
 			</div>
 
 			<div className="panel">

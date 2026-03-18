@@ -148,7 +148,7 @@ export default function WithdrawalsPage() {
 		<div className="dashboard-page">
 			<div className="page-header">
 				<h1>Withdrawals</h1>
-				<p>Submit a withdrawal request for a selected simulated finding.</p>
+				<p>Submit a withdrawal request.</p>
 			</div>
 
 			<div className="panel">

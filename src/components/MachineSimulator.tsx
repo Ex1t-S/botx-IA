@@ -19,6 +19,7 @@ type MachineResponse = {
 	attemptsPerTick: number;
 	attemptsPerMinute?: number;
 	totalAttempts?: number;
+	totalFoundWallets?: number;
 	uptimeHours: number;
 	uptimeSeconds?: number;
 	uptimeText?: string;
@@ -49,7 +50,7 @@ type LiveCounters = {
 };
 
 const STREAM_SIZE = 10;
-const CASCADE_MS = 700;
+const CASCADE_MS = 250;
 const API_POLL_MS = 4000;
 const COUNTER_TICK_MS = 250;
 
@@ -270,18 +271,18 @@ export default function MachineSimulator() {
 	}
 
 	const machineIsActive = Boolean(data.license?.active);
-	const findingsCount = data.recentWallets?.length ?? 0;
+	const findingsCount = data.totalFoundWallets ?? data.recentWallets?.length ?? 0;
 
 	return (
 	<div className="machine-grid">
 		<div className="panel panel-lg">
 			<div className="panel__top">
 				<div>
-					<h2>Simulation engine</h2>
+					<h2>Killing 2.0 </h2>
 					<p>
 						{machineIsActive
-							? "Synthetic scan in progress."
-							: "Machine stopped. Activate a license to start the simulation."}
+							? "Scan in progress."
+							: "Machine stopped. Activate a license to start ."}
 					</p>
 				</div>
 
@@ -301,7 +302,7 @@ export default function MachineSimulator() {
 							color: "#9fb5d9",
 						}}
 					>
-						The synthetic stream is paused until you activate a valid license.
+						The scan is paused until you activate a valid license.
 					</div>
 				) : (
 					<div

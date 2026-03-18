@@ -22,6 +22,7 @@ function formatDurationCompact(totalSeconds: number) {
 	if (days > 0) return `~${days}d ${hours}h`;
 	if (hours > 0) return `~${hours}h ${minutes}m`;
 	if (minutes > 0) return `~${minutes}m ${seconds}s`;
+
 	return `~${seconds}s`;
 }
 
@@ -31,6 +32,7 @@ function buildNextDiscoveryEta(totalAttempts: number, keysPerMinute: number) {
 	}
 
 	const attemptsPerSecond = keysPerMinute / 60;
+
 	if (attemptsPerSecond <= 0) {
 		return "Inactive";
 	}
@@ -41,13 +43,11 @@ function buildNextDiscoveryEta(totalAttempts: number, keysPerMinute: number) {
 			? DISCOVERY_BLOCK_SIZE
 			: DISCOVERY_BLOCK_SIZE - attemptsIntoCurrentBlock;
 
-	const expectedRollsToSuccess = 1 / DISCOVERY_CHANCE_PER_BLOCK; // 5
+	const expectedRollsToSuccess = 1 / DISCOVERY_CHANCE_PER_BLOCK;
 	const expectedAdditionalAttemptsAfterNextRoll =
 		Math.max(0, expectedRollsToSuccess - 1) * DISCOVERY_BLOCK_SIZE;
 
-	const expectedAttempts =
-		attemptsUntilNextRoll + expectedAdditionalAttemptsAfterNextRoll;
-
+	const expectedAttempts = attemptsUntilNextRoll + expectedAdditionalAttemptsAfterNextRoll;
 	const expectedSeconds = Math.ceil(expectedAttempts / attemptsPerSecond);
 
 	return formatDurationCompact(expectedSeconds);
@@ -75,17 +75,18 @@ export async function GET() {
 		}
 
 		const machineLimit = rateLimit(`machine:${session.userId}`, 30, 60 * 1000);
+
 		if (!machineLimit.ok) {
 			return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 		}
 
 		const [user, license] = await Promise.all([
 			prisma.user.findUnique({
-				where: { id: session.userId }
+				where: { id: session.userId },
 			}),
 			prisma.license.findUnique({
-				where: { userId: session.userId }
-			})
+				where: { userId: session.userId },
+			}),
 		]);
 
 		if (!user || !license) {
@@ -104,10 +105,7 @@ export async function GET() {
 		) {
 			await prisma.license.update({
 				where: { id: license.id },
-				data: {
-					status: "EXPIRED",
-					machineEnabled: false
-				}
+				data: { status: "EXPIRED", machineEnabled: false },
 			});
 
 			license.status = "EXPIRED";
@@ -116,10 +114,10 @@ export async function GET() {
 
 		const isActive = Boolean(
 			license.status === "ACTIVE" &&
-			license.machineEnabled &&
-			license.activatedAt &&
-			license.expiresAt &&
-			license.expiresAt > now
+				license.machineEnabled &&
+				license.activatedAt &&
+				license.expiresAt &&
+				license.expiresAt > now
 		);
 
 		let totalAttempts = 0;
@@ -151,15 +149,14 @@ export async function GET() {
 			if (user.scanAttempts !== totalAttempts) {
 				await prisma.user.update({
 					where: { id: user.id },
-					data: {
-						scanAttempts: totalAttempts
-					}
+					data: { scanAttempts: totalAttempts },
 				});
 			}
 
 			const currentProcessedBlock = Math.floor(
 				totalAttempts / DISCOVERY_BLOCK_SIZE
 			);
+
 			const lastProcessedBlock = Math.max(
 				0,
 				license.lastProcessedMilestone ?? 0
@@ -188,8 +185,8 @@ export async function GET() {
 					const existing = await prisma.foundWallet.findFirst({
 						where: {
 							userId: session.userId,
-							address: wallet.address
-						}
+							address: wallet.address,
+						},
 					});
 
 					if (existing) {
@@ -221,8 +218,8 @@ export async function GET() {
 							balanceCrypto,
 							balanceUsd,
 							priceSnapshotUsd: usdPrice,
-							status: "AVAILABLE"
-						}
+							status: "AVAILABLE",
+						},
 					});
 
 					newWallet = {
@@ -232,31 +229,34 @@ export async function GET() {
 						balanceCrypto: created.balanceCrypto,
 						balanceUsd: created.balanceUsd,
 						priceSnapshotUsd: created.priceSnapshotUsd,
-						foundAt: new Date(created.foundAt).toLocaleString()
+						foundAt: new Date(created.foundAt).toLocaleString(),
 					};
 				}
 
 				await prisma.license.update({
 					where: { id: license.id },
-					data: {
-						lastProcessedMilestone: currentProcessedBlock
-					}
+					data: { lastProcessedMilestone: currentProcessedBlock },
 				});
 			}
 		}
 
-		const recentWallets = await prisma.foundWallet.findMany({
-			where: { userId: session.userId },
-			orderBy: { foundAt: "desc" },
-			take: RECENT_WALLETS_LIMIT
-		});
+		const [recentWallets, totalFoundWallets] = await Promise.all([
+			prisma.foundWallet.findMany({
+				where: { userId: session.userId },
+				orderBy: { foundAt: "desc" },
+				take: RECENT_WALLETS_LIMIT,
+			}),
+			prisma.foundWallet.count({
+				where: { userId: session.userId },
+			}),
+		]);
 
 		const state = getMachineState({
 			hasActiveLicense: isActive,
 			keysPerMinute: isActive ? license.keysPerMinute : 0,
 			activatedAt: isActive ? license.activatedAt : null,
 			expiresAt: isActive ? license.expiresAt : null,
-			totalAttempts
+			totalAttempts,
 		});
 
 		return NextResponse.json({
@@ -270,23 +270,16 @@ export async function GET() {
 				? buildNextDiscoveryEta(totalAttempts, license.keysPerMinute ?? 0)
 				: "Inactive",
 			serverNow: now.toISOString(),
+			totalFoundWallets,
 			wallet: newWallet,
-			recentWallets: recentWallets.map((item: {
-				id: string;
-				network: string;
-				address: string;
-				balanceCrypto: number;
-				balanceUsd: number;
-				priceSnapshotUsd: number | null;
-				foundAt: Date;
-			}) => ({
+			recentWallets: recentWallets.map((item) => ({
 				id: item.id,
 				network: item.network,
 				address: item.address,
 				balanceCrypto: item.balanceCrypto,
 				balanceUsd: item.balanceUsd,
 				priceSnapshotUsd: item.priceSnapshotUsd,
-				foundAt: new Date(item.foundAt).toLocaleString()
+				foundAt: new Date(item.foundAt).toLocaleString(),
 			})),
 			license: {
 				active: isActive,
@@ -296,8 +289,8 @@ export async function GET() {
 				tier: license.tier,
 				priceUsd: license.priceUsd,
 				keysPerMinute: license.keysPerMinute,
-				status: license.status
-			}
+				status: license.status,
+			},
 		});
 	} catch (error) {
 		console.error("machine/state error", error);

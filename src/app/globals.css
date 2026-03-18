@@ -1129,3 +1129,20 @@ select:focus {
 		grid-template-columns: 1fr;
 	}
 }
+.social-links {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.contact-link {
+	color: inherit;
+	text-decoration: none;
+	font-weight: 700;
+}
+
+.contact-link:hover {
+	text-decoration: underline;
+	opacity: 0.9;
+}

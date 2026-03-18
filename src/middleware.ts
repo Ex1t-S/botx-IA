@@ -12,32 +12,48 @@ const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function middleware(request: NextRequest) {
 	const token = request.cookies.get(COOKIE_NAME)?.value;
-	const isDashboard = request.nextUrl.pathname.startsWith("/dashboard");
+	const pathname = request.nextUrl.pathname;
 
-	if (!isDashboard) {
+	const isDashboard = pathname.startsWith("/dashboard");
+	const isAuthPage = pathname === "/login" || pathname === "/register";
+
+	if (!isDashboard && !isAuthPage) {
 		return NextResponse.next();
 	}
 
 	if (!token) {
-		return NextResponse.redirect(new URL("/login", request.url));
+		if (isDashboard) {
+			return NextResponse.redirect(new URL("/login", request.url));
+		}
+
+		return NextResponse.next();
 	}
 
 	try {
 		await jwtVerify(token, secret);
+
+		if (isAuthPage) {
+			return NextResponse.redirect(new URL("/dashboard", request.url));
+		}
+
 		return NextResponse.next();
 	} catch {
-		const response = NextResponse.redirect(new URL("/login", request.url));
+		const response = isDashboard
+			? NextResponse.redirect(new URL("/login", request.url))
+			: NextResponse.next();
+
 		response.cookies.set(COOKIE_NAME, "", {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "lax",
 			path: "/",
-			maxAge: 0
+			maxAge: 0,
 		});
+
 		return response;
 	}
 }
 
 export const config = {
-	matcher: ["/dashboard/:path*"]
+	matcher: ["/dashboard/:path*", "/login", "/register"],
 };
