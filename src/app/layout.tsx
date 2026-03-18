@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
 	title: "BOTX",
-	description: "Search dead wallets cryptocurrency, best in the market",
+	description: "Search dead wallets cryptocurrency, best in the market.",
 	icons: {
     icon: "/images/favicon.png",
     shortcut: "/images/favicon.png",
