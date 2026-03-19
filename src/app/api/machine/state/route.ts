@@ -6,7 +6,7 @@ import { getMarketPrices } from "../../../../lib/market";
 import { rateLimit } from "../../../../lib/rate-limit";
 
 const DISCOVERY_BLOCK_SIZE = 100_000;
-const DISCOVERY_CHANCE_PER_BLOCK = 0.01;
+const DISCOVERY_CHANCE_PER_BLOCK = 0.05;
 const RECENT_WALLETS_LIMIT = 10;
 
 function formatDurationCompact(totalSeconds: number) {
